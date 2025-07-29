@@ -21,7 +21,7 @@ SECRET_KEY = 'django-insecure-s@(d8fy42c+0sp%=8^1*8b28l=2m&py05m&qx0s2p8uex*3d1j
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['gunicorn-myprojectwsgi-production.up.railway.app',]
 
 
 # Application definition
