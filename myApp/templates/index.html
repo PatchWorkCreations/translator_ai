@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Live Voice Translator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <style>
+    .pulse {
+      animation: pulse 1.5s infinite;
+    }
+  
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.7; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+  </style>
+  
+</head>
+<body class="bg-gradient-to-br from-blue-100 via-white to-yellow-50 min-h-screen flex items-center justify-center p-6">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-2xl w-full text-center">
+    
+    <div class="mb-6">
+      <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
+        <i class="fas fa-language text-blue-500 mr-2"></i> Live Voice Translator
+      </h1>
+      <p class="text-lg md:text-xl text-gray-600">
+        Speak in your language. Let others hear it in theirs.
+      </p>
+    </div>
+
+    <!-- Language selection -->
+    <div class="flex flex-col md:flex-row items-center justify-center gap-4 mb-6">
+        <!-- I Speak -->
+        <div class="flex items-center gap-2">
+          <label class="text-gray-700 text-lg">I Speak:</label>
+          <select id="fromLang" class="border rounded-lg px-4 py-2 text-lg">
+            <option value="en">English</option>
+            <option value="ru">Russian</option>
+            <option value="tl">Tagalog</option>
+          </select>
+        </div>
+      
+        <!-- Switch Icon -->
+        <button id="switchLangBtn" class="text-gray-600 hover:text-blue-600 text-2xl transition">
+          <i class="fas fa-exchange-alt"></i>
+        </button>
+      
+        <!-- They Hear -->
+        <div class="flex items-center gap-2">
+          <label class="text-gray-700 text-lg">They Hear:</label>
+          <select id="toLang" class="border rounded-lg px-4 py-2 text-lg">
+            <option value="ru">Russian</option>
+            <option value="en">English</option>
+            <option value="tl">Tagalog</option>
+          </select>
+        </div>
+      </div>
+      
+
+    <!-- Voice buttons -->
+    <!-- Add two new buttons in your buttons section -->
+    <div class="flex flex-col md:flex-row justify-center items-center gap-6 mb-6">
+        <button id="startBtn" class="bg-green-500 text-white px-6 py-3 rounded-xl text-lg shadow hover:bg-green-600">
+        <i class="fas fa-microphone mr-2"></i> Start Speaking
+        </button>
+        <button id="stopBtn" class="bg-red-500 text-white px-6 py-3 rounded-xl text-lg shadow hover:bg-red-600" disabled>
+        <i class="fas fa-stop mr-2"></i> Stop
+        </button>
+        
+    </div>
+    
+
+    <!-- Output -->
+    <div class="relative bg-gray-100 p-6 rounded-xl text-left">
+        <p class="text-gray-800 text-2xl font-semibold mb-4">Translated Text:</p>
+        <div id="translatedText" class="text-gray-700 italic" style="font-size: 1.5rem; line-height: 1.6; padding-bottom: 3rem; min-height: 4rem;">
+          ...
+        </div>
+      
+        <div class="absolute bottom-3 right-4 flex gap-3">
+          <button id="rehearBtn" class="bg-blue-500 text-white px-4 py-2 rounded-xl text-sm shadow hover:bg-blue-600" disabled title="Rehear">
+            <i class="fas fa-play mr-1"></i> Rehear
+          </button>
+          <button id="restartBtn" class="bg-gray-500 text-white px-4 py-2 rounded-xl text-sm shadow hover:bg-gray-600" title="Restart">
+            <i class="fas fa-redo mr-1"></i> Restart
+          </button>
+        </div>
+      </div>
+      
+      
+      
+
+    <!-- Footer -->
+    <div class="mt-6 text-gray-500 text-sm">
+      <p>🎤 Powered by iRiseUp.ai</p>
+    </div>
+  </div>
+
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const rehearBtn = document.getElementById('rehearBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const translatedText = document.getElementById('translatedText');
+    const fromLang = document.getElementById('fromLang');
+    const toLang = document.getElementById('toLang');
+  
+    let recognition;
+    let isListening = false;
+    let lastAudio = null;       // store last audio object for rehear
+    let lastAudioBase64 = null; // store last audio base64 fallback
+  
+    // Load cached language selections on page load
+    window.onload = () => {
+      const savedFrom = localStorage.getItem('fromLang');
+      const savedTo = localStorage.getItem('toLang');
+      if (savedFrom) fromLang.value = savedFrom;
+      if (savedTo) toLang.value = savedTo;
+  
+      // Disable buttons initially
+      stopBtn.disabled = true;
+      rehearBtn.disabled = true;
+    };
+  
+    // Save lang changes to localStorage
+    fromLang.addEventListener('change', () => {
+      localStorage.setItem('fromLang', fromLang.value);
+    });
+    toLang.addEventListener('change', () => {
+      localStorage.setItem('toLang', toLang.value);
+    });
+  
+    if ('webkitSpeechRecognition' in window) {
+      recognition = new webkitSpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+  
+      startBtn.addEventListener('click', () => {
+        recognition.lang = fromLang.value;
+        recognition.start();
+        isListening = true;
+  
+        startBtn.innerHTML = `<i class="fas fa-microphone mr-2"></i> Listening...`;
+        startBtn.classList.add('pulse', 'bg-green-600');
+        stopBtn.innerHTML = `<i class="fas fa-language mr-2"></i> Translate`;
+        stopBtn.disabled = false;
+        rehearBtn.disabled = true;
+      });
+  
+      stopBtn.addEventListener('click', () => {
+        recognition.stop();
+        isListening = false;
+  
+        startBtn.innerHTML = `<i class="fas fa-microphone mr-2"></i> Start Speaking`;
+        startBtn.classList.remove('pulse', 'bg-green-600');
+        stopBtn.innerHTML = `<i class="fas fa-stop mr-2"></i> Stop`;
+        stopBtn.disabled = true;
+      });
+  
+      recognition.onresult = async (event) => {
+        const speechText = event.results[event.results.length - 1][0].transcript;
+        translatedText.innerText = 'Translating...';
+  
+        try {
+          const response = await fetch('/translate/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+              text: speechText,
+              target_language: toLang.options[toLang.selectedIndex].text
+            })
+          });
+  
+          const data = await response.json();
+  
+          if (data.translated_text) {
+            translatedText.innerText = data.translated_text;
+  
+            if (data.audio_base64) {
+              lastAudioBase64 = data.audio_base64;
+              lastAudio = new Audio("data:audio/mpeg;base64," + data.audio_base64);
+              lastAudio.play();
+            } else {
+              lastAudioBase64 = null;
+              lastAudio = null;
+              const utter = new SpeechSynthesisUtterance(data.translated_text);
+              utter.lang = toLang.value;
+              speechSynthesis.speak(utter);
+            }
+            rehearBtn.disabled = false;
+          } else {
+            translatedText.innerText = 'Error: ' + (data.error || 'Unknown error');
+            rehearBtn.disabled = true;
+          }
+  
+          startBtn.innerHTML = `<i class="fas fa-microphone mr-2"></i> Start Speaking`;
+          startBtn.classList.remove('pulse', 'bg-green-600');
+          stopBtn.innerHTML = `<i class="fas fa-stop mr-2"></i> Stop`;
+          stopBtn.disabled = true;
+  
+          startBtn.disabled = false;
+  
+        } catch (error) {
+          translatedText.innerText = 'Translation failed.';
+          console.error(error);
+  
+          startBtn.innerHTML = `<i class="fas fa-microphone mr-2"></i> Start Speaking`;
+          startBtn.classList.remove('pulse', 'bg-green-600');
+          stopBtn.innerHTML = `<i class="fas fa-stop mr-2"></i> Stop`;
+          stopBtn.disabled = true;
+  
+          rehearBtn.disabled = true;
+          startBtn.disabled = false;
+        }
+      };
+  
+      // Rehear button plays last translated audio or speech
+      rehearBtn.addEventListener('click', () => {
+        if (lastAudio) {
+          lastAudio.play();
+        } else if (lastAudioBase64) {
+          const audio = new Audio("data:audio/mpeg;base64," + lastAudioBase64);
+          audio.play();
+          lastAudio = audio;
+        } else {
+          if (translatedText.innerText) {
+            const utter = new SpeechSynthesisUtterance(translatedText.innerText);
+            utter.lang = toLang.value;
+            speechSynthesis.speak(utter);
+          }
+        }
+      });
+  
+      // Restart button stops everything and clears UI
+      restartBtn.addEventListener('click', () => {
+        if (isListening) {
+          recognition.stop();
+          isListening = false;
+        }
+        speechSynthesis.cancel();
+        lastAudio = null;
+        lastAudioBase64 = null;
+        translatedText.innerText = '...';
+        startBtn.innerHTML = `<i class="fas fa-microphone mr-2"></i> Start Speaking`;
+        startBtn.classList.remove('pulse', 'bg-green-600');
+        stopBtn.innerHTML = `<i class="fas fa-stop mr-2"></i> Stop`;
+        stopBtn.disabled = true;
+        rehearBtn.disabled = true;
+        startBtn.disabled = false;
+      });
+  
+    } else {
+      alert("Speech Recognition is not supported in this browser.");
+    }
+
+    document.getElementById('switchLangBtn').addEventListener('click', function () {
+  const fromSelect = document.getElementById('fromLang');
+  const toSelect = document.getElementById('toLang');
+
+  const temp = fromSelect.value;
+  fromSelect.value = toSelect.value;
+  toSelect.value = temp;
+});
+  </script>
+  
+</body>
+</html>
